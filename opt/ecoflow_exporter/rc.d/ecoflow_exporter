@@ -1,0 +1,65 @@
+#!/bin/sh
+
+# PROVIDE: ecoflow_exporter
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="ecoflow_exporter"
+rcvar="ecoflow_exporter_enable"
+
+command="/usr/local/bin/ecoflow-exporter"
+pidfile="/var/run/${name}.pid"
+
+: ${ecoflow_exporter_enable:=no}
+: ${ecoflow_exporter_listen_address:=":9100"}
+: ${ecoflow_exporter_extra_flags:=""}
+: ${ecoflow_exporter_log_file:="/var/log/ecoflow-exporter.log"}
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+status_cmd="${name}_status"
+
+ecoflow_exporter_start()
+{
+    echo "Starting ${name}"
+
+    export \
+        EXPORTER_TYPE \
+        ECOFLOW_EMAIL \
+        ECOFLOW_PASSWORD \
+        ECOFLOW_DEVICES \
+        MQTT_DEVICE_OFFLINE_THRESHOLD_SECONDS \
+        DEBUG_ENABLED \
+        METRIC_PREFIX \
+        SCRAPING_INTERVAL \
+        PROMETHEUS_ENABLED \
+        PROMETHEUS_PORT
+
+    /bin/sh -c "${command} --listen ${ecoflow_exporter_listen_address} ${ecoflow_exporter_extra_flags} > ${ecoflow_exporter_log_file} 2>&1 & echo \$! > ${pidfile}"
+}
+
+ecoflow_exporter_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        kill "$(cat ${pidfile})"
+        rm -f "${pidfile}"
+        echo "Stopped ${name}"
+    else
+        echo "${name} is not running"
+    fi
+}
+
+ecoflow_exporter_status()
+{
+    if [ -f "${pidfile}" ] && kill -0 "$(cat ${pidfile})" 2>/dev/null; then
+        echo "${name} is running (pid $(cat ${pidfile}))"
+    else
+        echo "${name} is not running"
+        return 1
+    fi
+}
+
+load_rc_config $name
+run_rc_command "$1"

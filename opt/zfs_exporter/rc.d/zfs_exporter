@@ -1,0 +1,54 @@
+#!/bin/sh
+
+# PROVIDE: zfs_exporter
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="zfs_exporter"
+rcvar="zfs_exporter_enable"
+
+command="/usr/local/bin/zfs_exporter"
+pidfile="/var/run/${name}.pid"
+
+# defaults (override in rc.conf)
+: ${zfs_exporter_enable:=no}
+: ${zfs_exporter_listen_address:=":9134"}
+: ${zfs_exporter_extra_flags:=""}
+: ${zfs_exporter_log_file:="/var/log/zfs_exporter.log"}
+
+start_cmd="${name}_start"
+stop_cmd="${name}_stop"
+status_cmd="${name}_status"
+
+zfs_exporter_start()
+{
+    echo "Starting ${name}"
+    /bin/sh -c "${command} --web.listen-address=${zfs_exporter_listen_address} ${zfs_exporter_extra_flags} > ${zfs_exporter_log_file} 2>&1 & echo \$! > ${pidfile}"
+}
+
+zfs_exporter_stop()
+{
+    if [ -f "${pidfile}" ]; then
+        kill "$(cat ${pidfile})"
+        rm -f "${pidfile}"
+        echo "Stopped ${name}"
+    else
+        echo "${name} is not running"
+    fi
+}
+
+zfs_exporter_status()
+{
+    if [ -f "${pidfile}" ] && kill -0 "$(cat ${pidfile})" 2>/dev/null; then
+        echo "${name} is running (pid $(cat ${pidfile}))"
+    else
+        echo "${name} is not running"
+        return 1
+    fi
+}
+
+load_rc_config $name
+run_rc_command "$1"
+
